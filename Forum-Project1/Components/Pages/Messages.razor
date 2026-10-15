@@ -1,0 +1,133 @@
+﻿@page "/messages"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Forum_Project1.Data
+@using Forum_Project1.Models
+@using Forum_Project1.Services
+@inject IPrivateMessageService PrivateMessageService
+@inject IUserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="container-fluid mt-4" style="color: white;">
+    <h3 class="mb-4">Private Messages</h3>
+
+    <div class="row style-chat-box" style="height: 70vh; background-color: #2b3035; border-radius: 0.8rem; overflow: hidden; border: 1px solid #495057;">
+        
+        <div class="col-md-4 border-end border-secondary p-0" style="height: 100%; overflow-y: auto;">
+            <div class="p-3 bg-dark fw-bold border-bottom border-secondary">
+                Chattar
+            </div>
+            <ul class="list-group list-group-flush">
+                @if (users == null)
+                {
+                    <li class="list-group-item bg-transparent text-white">Laddar användare...</li>
+                }
+                else
+                {
+                    @foreach (var user in users)
+                    {
+                        @if (user.Id != currentUserId)
+                        {
+                            <li class="list-group-item bg-transparent text-white border-secondary list-group-item-action @(selectedUserId == user.Id ? "active bg-primary" : "")" 
+                                style="cursor: pointer;" 
+                                @onclick="() => SelectUser(user.Id)">
+                                <div class="d-flex justify-content-between align-items-center" style="pointer-events: none;">
+                                    <span>@(string.IsNullOrWhiteSpace(user.Name) ? user.UserName : user.Name)</span>
+                                </div>
+                            </li>
+                        }
+                    }
+                }
+            </ul>
+        </div>
+
+        <div class="col-md-8 d-flex flex-column p-0" style="height: 100%;">
+            @if (string.IsNullOrEmpty(selectedUserId))
+            {
+                <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                    <h5>Välj en användare i listan till vänster för att starta en chatt</h5>
+                </div>
+            }
+            else
+            {
+                <div class="flex-grow-1 p-3" style="overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+                    @foreach (var msg in conversation)
+                    {
+                        bool isMe = msg.SenderId == currentUserId;
+                        <div style="align-self: @(isMe ? "flex-end" : "flex-start"); max-width: 70%;">
+                            <div class="p-2 px-3 rounded-3 @(isMe ? "bg-primary text-white" : "bg-secondary text-white")">
+                                <p class="mb-1" style="word-break: break-word;">@msg.Content</p>
+                                <small class="text-white-50 style-time" style="font-size: 0.7rem;">@msg.SentAt.ToString("HH:mm")</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="p-3 bg-dark border-top border-secondary">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Skriv ett meddelande..." 
+                               @bind="newMessageText" @bind:event="oninput" @onkeyup="HandleKeyUp" />
+                        <button class="btn btn-primary" type="button" @onclick="SendMessage">Skicka</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+    </div>
+</div>
+
+@code {
+    public string currentUserId = string.Empty;
+    private string selectedUserId = string.Empty;
+    private string newMessageText = string.Empty;
+
+    private List<ApplicationUser> users = new List<ApplicationUser>();
+    private List<PrivateMessage> conversation = new List<PrivateMessage>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is not null && user.Identity.IsAuthenticated)
+        {
+            currentUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+        }
+
+        users = await UserService.GetAllUsersAsync(); 
+    }
+
+    private async Task SelectUser(string userId)
+    {
+        selectedUserId = userId;
+        await LoadConversation();
+        StateHasChanged();
+    }
+
+    private async Task LoadConversation()
+    {
+        if (!string.IsNullOrEmpty(selectedUserId) && !string.IsNullOrEmpty(currentUserId))
+        {
+            conversation = await PrivateMessageService.GetConversationHistoryAsync(currentUserId, selectedUserId);
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(newMessageText) || string.IsNullOrEmpty(selectedUserId) || string.IsNullOrEmpty(currentUserId) )
+            return;
+
+        await PrivateMessageService.SendMessageAsync(currentUserId, selectedUserId, newMessageText);
+        newMessageText = string.Empty;
+
+        await LoadConversation();
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+}

@@ -1,0 +1,260 @@
+﻿@page "/topicDetails-page/{TopicId:int}"
+@rendermode InteractiveServer
+@using Forum_Project1.Data
+@using Forum_Project1.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject Forum_Project1.Services.ITopicService TopicService
+@inject Forum_Project1.Services.IPostService PostService
+@inject IWebHostEnvironment Env
+@inject ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+@if (topic == null)
+{
+    <p style="color: white;">Loading topic...</p>
+}
+else
+{
+    <div style="background-color: #2b3035; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h2 style="margin: 0;">@topic.Title</h2>
+        <span style="color: #adb5bd; font-size: 0.85rem;">
+            Created by: @(topic.ApplicationUser?.Name ?? "Admin") • @topic.CreatedAt.ToString("yyyy-MM-dd")
+        </span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 2.5fr 1fr; margin-top: 30px; gap: 2rem;">
+
+        <div style="background-color: #2b3035; padding: 20px; border: 1px solid #495057; border-radius: 8px;">
+            <h4 style="color: white; margin-bottom: 20px;">Replies / Comments</h4>
+
+            @if (topic?.Posts != null && topic.Posts.Any())
+            {
+                <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; margin: 0;">
+                    @foreach (var post in topic.Posts.OrderByDescending(p => p.CreatedAt))
+                    {
+                        <li style="background-color: #212529; color: white; padding: 15px; border-radius: 8px; border: 1px solid #495057; display: flex; gap: 15px;">
+                            <a href="/messages">
+                                <img src="@GetImageUrl(post.ApplicationUser?.ProfileImageUrl)"
+                                     style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" />
+                            </a>
+
+                            <div style="flex-grow: 1;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                    <strong style="color: #0d6efd;">@(post.ApplicationUser?.Name ?? "User")</strong>
+                                    <small style="color: #adb5bd;">@post.CreatedAt.ToString("yyyy-MM-dd HH:mm")</small>
+                                </div>
+                                <p style="margin: 0;">@post.Content</p>
+
+
+                                @if (!string.IsNullOrEmpty(post.ImageUrl))
+                                {
+                                    <div style="margin-top: 10px;">
+                                        <img src="@post.ImageUrl" style="max-width: 100%; max-height: 300px; border-radius: 5px;" />
+                                    </div>
+                                }
+
+                                <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => LikePost(post.Id, post.UserId)">
+                                        👍 Like (@(post.Interactions?.Count(i => i.ReactionType == "like") ?? 0))
+                                    </button>
+
+                                    @if (reportedPostIds.Contains(post.Id))
+                                    {
+                                        <div class="alert alert-success mt-2 mb-0 p-2 text-center" role="alert">
+                                            Thank you! The post has been reported and will be reviewed by an administrator.
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => ReportPost(post.Id)">
+                                            Report offensive post
+                                        </button>
+                                    }
+
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(reportErrorMessage))
+                                {
+                                    <div style="margin-top: 8px;">
+                                        <span class="text-danger small">@reportErrorMessage</span>
+                                    </div>
+                                }
+
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p style="color: #adb5bd;">No replies yet. Be the first to reply in the form on the right!</p>
+            }
+        </div>
+
+        <div style="background-color: #2b3035; padding: 20px; border: 1px solid #495057; border-radius: 8px; height: fit-content; color: white;">
+            <h5 style="margin-bottom: 15px;">Add post</h5>
+
+            <EditForm Model="newPosts" OnValidSubmit="AddPost" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <label class="form-label">Content:</label>
+                    <InputTextArea @bind-Value="newPosts.Content" class="form-control" rows="4" placeholder="Write here..." style="background-color: white; color: black; border-color: #495057;" />
+                </div>
+
+                <div>
+                    <label class="form-label">Attach image (.jpg, .png, .webp, .gif):</label>
+                    <InputFile OnChange="HandleFileSelected" accept=".jpg,.jpeg,.png,.gif,.webp" class="form-control" style="background-color: white; color: black; border-color: #495057;" />
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="margin-top: 10px; width: 100%;">
+                    Send
+                </button>
+            </EditForm>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public int TopicId { get; set; }
+
+    private bool isReported = false;
+    private Post? newPosts = new Post { CreatedAt = DateTime.Now };
+    private Topic? topic;
+    private string? errorMessage;
+    private string newPostContent = string.Empty;
+
+    private string? reportErrorMessage;
+    private IBrowserFile? selectedFile;
+    public int? reportedPostId;
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs args)
+    {
+        selectedFile = args.File;
+    }
+
+    private HashSet<int> reportedPostIds = new();
+    private async Task ReportPost(int postId)
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userId)) return;
+
+        var report = new Report
+        {
+            PostId = postId,
+            ReportedByUserId = userId,
+            Reason = "Offensive content",
+            Status = "Pending",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        DbContext.Reports.Add(report);
+        await DbContext.SaveChangesAsync();
+
+        reportedPostIds.Add(postId);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadTopic();
+    }
+
+    private async Task LoadTopic()
+    {
+        try
+        {
+            topic = await TopicService.GetTopicByIdAsync(TopicId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching topic: {ex.Message}");
+        }
+    }
+
+    private async Task AddPost()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newPosts.Content))
+            {
+                errorMessage = "You cannot send an empty reply.";
+                return;
+            }
+
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                errorMessage = "You have to be logged in to post.";
+                return;
+            }
+
+            newPosts.UserId = userId;
+
+            if (selectedFile != null)
+            {
+                var uploadsFolder = Path.Combine(Env.WebRootPath, "uploads");
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                var uniqueFileName = $"{Guid.NewGuid()}_{selectedFile.Name}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await selectedFile.OpenReadStream(maxAllowedSize: 5242880).CopyToAsync(stream);
+                }
+                newPosts.ImageUrl = $"/uploads/{uniqueFileName}";
+            }
+
+            newPosts.TopicId = TopicId;
+
+            if (newPosts.UserId == "0") newPosts.UserId = "1";
+
+            var createdPost = await PostService.CreatePostAsync(newPosts);
+            if (createdPost != null)
+            {
+                newPosts = new Post { CreatedAt = DateTime.Now };
+                selectedFile = null;
+                errorMessage = null;
+                await LoadTopic();
+            }
+            else
+            {
+                errorMessage = "Could not save the post";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task LikePost(int postId, string authorUserId)
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var currentUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            await PostService.AddLikeAsync(postId, currentUserId);
+            await LoadTopic();
+        }
+    }
+
+    private string GetImageUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return "https://via.placeholder.com/40";
+
+        if (url.StartsWith("http://") || url.StartsWith("https://"))
+            return url;
+
+        return url.StartsWith("/") ? url : $"/{url}";
+    }
+}

@@ -1,0 +1,159 @@
+﻿@page "/"
+@inject Forum_Project1.Services.ICategoryService CategoryService
+@inject Forum_Project1.Services.ITopicService TopicService
+@using Forum_Project1.Models
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (isLoggedInNotice)
+{
+    <div class="alert alert-success text-center" role="alert">
+        Välkommen! Du är nu inloggad.
+    </div>
+}
+<header class="bg-dark text-white p-3 mb-4 shadow-sm">
+    <div class="container d-flex flex-wrap align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-4">
+            <a href="/" class="text-white text-decoration-none h4 mb-0">Forum</a>
+            <nav class="d-flex flex-wrap align-items-center gap-2">
+                @if (categories == null)
+                {
+                    <span class="text-white-50 small">Loading categories...</span>
+                }
+                else
+                {
+                    <div class="d-flex flex-nowrap overflow-auto gap-2 pb-2" style="max-width: 100%;">
+                    @foreach (var category in categories)
+                    {
+                        <NavLink class="btn btn-outline-light text-nowrap" href="@($"/category/{category.Id}")">
+                            @category.Name
+                        </NavLink>
+                    }
+                    </div>
+                }
+            </nav>
+        </div>
+        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <AuthorizeView>
+                <Authorized>
+                    <NavLink style="border: 1px solid yellow; padding: 0.4rem 0.3rem; border-radius: 0.6rem;" class="nav-link text-white" href="messages"><i class="bi bi-chat-dots me-1"></i> Messages</NavLink>
+                    <NavLink style="border: 1px solid red; padding: 0.4rem 0.3rem; border-radius: 0.6rem;" class="nav-link text-white" href="adminreports-page"><i class="bi bi-flag-fill me-1"></i> Reports</NavLink>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+    </div>
+</header>
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <AuthorizeView Roles="Admin">
+            <Authorized>
+                <a href="create-category" class="btn btn-warning fw-bold mb-3">+ Create a Category</a>
+            </Authorized>
+            <NotAuthorized>
+                <h3>Forum Overview</h3>
+                <a href="create-thread" class="btn btn-warning fw-bold">+ Create a thread</a>
+            </NotAuthorized>
+        </AuthorizeView>
+
+    </div>
+
+
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold">Categories</div>
+                <div class="list-group list-group-flush">
+                    @if (categories == null)
+                    {
+                        <div class="list-group-item p-3 text-muted">Loading categories...</div>
+                    }
+                    else
+                    {
+                        @foreach (var kateg in categories)
+                        {
+                            <div class="list-group-item p-3 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-1">
+                                        <NavLink href="@($"category/{kateg.Id}")" class="text-decoration-none text-dark fw-bold">
+                                            @kateg.Name
+                                        </NavLink>
+                                    </h5>
+                                    <small class="text-muted">@kateg.Description</small>
+                                </div>
+                                <span class="badge bg-secondary rounded-pill">124 threads</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold">Latest Topics</div>
+                <ul class="list-group list-group-flush small">
+                    @if (latestTopics == null)
+                    {
+                        <li class="list-group-item text-muted">Loading topics...</li>
+                    }
+                    else if (!latestTopics.Any())
+                    {
+                        <li class="list-group-item text-muted">No topics found.</li>
+                    }
+                    else
+                    {
+                        @foreach (var topic in latestTopics.OrderByDescending(t => t.CreatedAt).Take(8))
+                        {
+                            <li class="list-group-item">
+                                <NavLink href="@($"/topicDetails-page/{topic.Id}")" class="fw-bold text-decoration-none text-primary">
+                                    @topic.Title
+                                </NavLink> <br />
+                                <span class="text-muted">
+                                    by @topic.AuthorName • @topic.CreatedAt.ToString("MMM dd, yyyy")
+                                </span>
+                                <br />
+                            </li>
+                        }
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Category>? categories;
+    private List<TopicDto>? latestTopics;
+    private string? errorMessage;
+
+    [SupplyParameterFromQuery]
+    private string? loggedin { get; set; }
+
+    private bool isLoggedInNotice => loggedin == "true";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            categories = await CategoryService.GetCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Fel vid categories: {ex.Message}");
+        }
+
+        try
+        {
+            latestTopics = await TopicService.GetAllTopicsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Fel vid topics: {ex.Message}");
+        }
+    }
+}

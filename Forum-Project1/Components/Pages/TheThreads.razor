@@ -1,0 +1,63 @@
+﻿@page "/threads-page/{CategoryId:int}/sub/{SubCategoryId:int}"
+@rendermode InteractiveServer
+@using Forum_Project1.Models
+@inject Forum_Project1.Services.ITopicService TopicService
+
+<h3>TheThreads</h3>
+
+<div style="padding: 3rem; width: 45%; border: 1px solid black; border-radius: 1.2rem; margin-top: 2rem;">
+    @if (latestTopics == null)
+    {
+        <p class="text-muted" style="margin: 0;">Loading topics...</p>
+    }
+    else if (!latestTopics.Any())
+    {
+        <div style="color: #adb5bd; text-align: center;">
+            <p style="margin-bottom: 0.5rem;">No topics available yet. Please add one!</p>
+        </div>
+    }
+    else
+    {
+        <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; max-width: 600px;">
+            @foreach (var topic in latestTopics)
+            {
+                <li style="display: flex; flex-direction: column; padding: 8px 12px; background-color: #2b3035; border: 1px solid #495057; border-radius: 8px;">
+                    <NavLink href="@($"topicDetails-page/{topic.Id}")" style="font-weight: 600; font-size: 1.05rem; text-decoration: none; color: white; margin-bottom: 2px;">
+                        @topic.Title
+                    </NavLink>
+                    <span style="font-size: 0.85rem; color: #adb5bd;">
+                        by @(topic.ApplicationUser?.Name ?? "Unknown") • @topic.CreatedAt.ToString("MMM dd, yyyy")
+                    </span>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+<AuthorizeView>
+    <Authorized>
+        <NavLink style="padding: 1rem 0.5rem; display: inline-block; background-color: green; margin-top: 1rem; color: white; text-decoration: none; border-radius: 0.8rem;" href="create-thread">Add New Topic</NavLink>
+    </Authorized>
+    <NotAuthorized>
+        <p style="margin-top: 1rem; color: red;">You must be logged in to add a new topic.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public int CategoryId { get; set; }
+    [Parameter] public int SubCategoryId { get; set; }
+
+    private List<Topic>? latestTopics;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            latestTopics = await TopicService.GetTopicsBySubCategoryIdAsync(SubCategoryId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching data: {ex.Message}");
+        }
+    }
+}

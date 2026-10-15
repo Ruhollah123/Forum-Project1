@@ -1,0 +1,193 @@
+﻿@page "/Account/Register"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using Forum_Project1.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject ILogger<Register> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+@inject IWebHostEnvironment WebHostEnvironment
+@inject ApplicationDbContext DbContext
+
+<PageTitle>Register</PageTitle>
+
+<h1>Register</h1>
+
+<div class="row">
+    <div class="col-lg-6">
+        <StatusMessage Message="@Message" />
+        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+            <DataAnnotationsValidator />
+            <h2>Create a new account.</h2>
+            <hr />
+            <ValidationSummary class="text-danger" role="alert" />
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                <label for="Input.Email">Email</label>
+                <ValidationMessage For="() => Input.Email" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Name" id="Input.Name" class="form-control" placeholder="Name" />
+                <label for="Input.Name">Name</label>
+                <ValidationMessage For="() => Input.Name" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="Input.Password">Password</label>
+                <ValidationMessage For="() => Input.Password" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="Input.ConfirmPassword">Confirm Password</label>
+                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <label for="profileImage" class="form-label"></label>
+                <InputFile id="profileImage" OnChange="HandleFileSelected" class="form-control" />
+            </div>
+
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
+        </EditForm>
+    </div>
+    <div class="col-lg-4 col-lg-offset-2">
+        <section>
+            <h3>Use another service to register.</h3>
+            <hr />
+            <ExternalLoginPicker />
+        </section>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<IdentityError>? identityErrors;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    private IBrowserFile? selectedFile;
+
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs args)
+    {
+        selectedFile = args.File;
+    }
+
+    public async Task RegisterUser(EditContext editContext)
+    {
+        var newUser = CreateUser();
+        newUser.Name = Input.Name;
+
+        if (selectedFile is not null)
+        {
+            var uploadedImagePath = await SaveProfileImageAsync(selectedFile);
+            if (uploadedImagePath is not null)
+            {
+                newUser.ProfileImageUrl = uploadedImagePath;
+            }
+        }
+
+        var cancellationToken = CancellationToken.None;
+        await UserStore.SetUserNameAsync(newUser, Input.Email, cancellationToken);
+        await GetEmailStore().SetEmailAsync(newUser, Input.Email, cancellationToken);
+
+        var creationResult = await UserManager.CreateAsync(newUser, Input.Password);
+
+        if (!creationResult.Succeeded)
+        {
+            identityErrors = creationResult.Errors;
+            return;
+        }
+
+        await SignInManager.SignInAsync(newUser, isPersistent: false);
+        RedirectManager.RedirectTo(ReturnUrl);
+    }
+
+    private async Task<string?> SaveProfileImageAsync(IBrowserFile file)
+    {
+        ReadOnlySpan<string> validExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".avif"];
+        var fileExtension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        if (!validExtensions.Contains(fileExtension))
+        {
+            return null;
+        }
+
+        var uploadFolder = Path.Combine(WebHostEnvironment.WebRootPath, "uploads");
+        Directory.CreateDirectory(uploadFolder);
+
+        var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+        var destinationPath = Path.Combine(uploadFolder, uniqueFileName);
+
+        const long maxFileSize = 10 * 1024 * 1024;
+        await using var destinationStream = File.Create(destinationPath);
+        await using var sourceStream = file.OpenReadStream(maxFileSize);
+
+        await sourceStream.CopyToAsync(destinationStream);
+
+        return $"/uploads/{uniqueFileName}";
+    }
+
+    private ApplicationUser CreateUser()
+    {
+        try
+        {
+            return Activator.CreateInstance<ApplicationUser>();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
+                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+        }
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+        return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [Display(Name = "Name")]
+        public string Name { get; set; } = "";
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

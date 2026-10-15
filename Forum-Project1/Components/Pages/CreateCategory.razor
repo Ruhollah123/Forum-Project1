@@ -1,0 +1,33 @@
+﻿@page "/create-category"
+@using Forum_Project1.Models
+@using Forum_Project1.Data
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<h3>Create Category</h3>
+
+<EditForm style="display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2rem;" Model="newCategory" OnValidSubmit="HandleSubmit">
+    <div style="width: 30%;">
+        <label style="font-size: 1.5rem;" class="form-label">Category Name:</label>
+        <InputText @bind-Value="newCategory.Name" class="form-control" />
+    </div>
+
+    <div style="width: 30%;">
+        <label class="form-label">Description:</label>
+        <InputTextArea @bind-Value="newCategory.Description" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+</EditForm>
+
+@code {
+    private Category newCategory = new();
+
+    private async Task HandleSubmit()
+    {
+        DbContext.Categories.Add(newCategory);
+        await DbContext.SaveChangesAsync();
+        Navigation.NavigateTo("/");
+    }
+}

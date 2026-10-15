@@ -1,0 +1,101 @@
+﻿@page "/adminreports-page"
+@using Forum_Project1.Data
+@using Forum_Project1.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ApplicationDbContext DbContext
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+
+<h3>AdminReports</h3>
+
+@if (reports == null)
+{
+    <p>Laddar anmälningar...</p>
+}
+else if (!reports.Any())
+{
+    <p>Inga aktiva anmälningar att granska!</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Datum</th>
+                <th>Anmält Inlägg</th>
+                <th>Skapat av</th>
+                <th>Anmält av</th>
+                <th>Åtgärd</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var report in reports)
+            {
+                <tr>
+                    <td>@report.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>
+                        @if (report.Post != null)
+                        {
+                            <a href="/topicDetails-page/@report.Post.TopicId" class="text-decoration-none">
+                                @report.Post.Content
+                            </a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Inlägget är borttaget</span>
+                        }
+                    </td>
+                    <td>@report.Post?.ApplicationUser?.Name</td>
+                    <td>@(report.ApplicationUser?.Name ?? report.ReportedByUserId)</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" @onclick="() => DeletePost(report)">
+                            Ta bort inlägg
+                        </button>
+                        <button class="btn btn-secondary btn-sm" @onclick="() => DismissReport(report)">
+                            Avfärda
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Report>? reports;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReports();
+    }
+
+    private async Task LoadReports()
+    {
+        reports = await DbContext.Reports
+            .Include(r => r.Post)
+                .ThenInclude(p => p.ApplicationUser)
+            .Include(r => r.ApplicationUser)
+            .Where(r => !r.IsResolved)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
+    private async Task DeletePost(Report report)
+    {
+        if (report.Post != null)
+        {
+            DbContext.Posts.Remove(report.Post);
+        }  
+        report.IsResolved = true;
+        await DbContext.SaveChangesAsync();
+        await LoadReports();
+    }
+
+    private async Task DismissReport(Report report)
+    {
+        report.IsResolved = true;
+        await DbContext.SaveChangesAsync();
+        await LoadReports();
+    }
+}

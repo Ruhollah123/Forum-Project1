@@ -1,0 +1,105 @@
+﻿@page "/create-thread"
+@using Forum_Project1.Models
+@using Forum_Project1.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@inject ApplicationDbContext Context
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@rendermode InteractiveServer
+
+<h3>Create Topic</h3>
+
+<EditForm Model="newTopic" OnValidSubmit="HandleSubmit" style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem; width: 50%; margin: 0 auto;">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div style="width: 100%;">
+        <label class="form-label font-weight-bold">Main Category:</label>
+        <select class="form-control" @onchange="OnCategoryChanged">
+            <option value="0">-- Select Main Category --</option>
+            @foreach (var cat in categories)
+            {
+                <option value="@cat.Id">@cat.Name</option>
+            }
+        </select>
+    </div>
+
+    <div style="width: 100%;">
+        <label class="form-label font-weight-bold">SubCategory:</label>
+        <InputSelect @bind-Value="newTopic.SubCategoryId" class="form-control" disabled="@(selectedCategoryId == 0)">
+            <option value="0">-- Select SubCategory --</option>
+            @foreach (var subCat in filteredSubCategories)
+            {
+                <option value="@subCat.Id">@subCat.Name</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div style="width: 100%;">
+        <label class="form-label font-weight-bold">Topic Title:</label>
+        <InputText @bind-Value="newTopic.Title" class="form-control" placeholder="Enter topic title..." />
+    </div>
+
+    <button type="submit" class="btn btn-success">
+        Create Topic
+    </button>
+</EditForm>
+
+@code {
+    private Topic newTopic = new Topic();
+    private List<Category> categories = new List<Category>();
+    private List<SubCategory> filteredSubCategories = new List<SubCategory>();
+    private int selectedCategoryId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await Context.Categories
+            .Include(c => c.SubCategories)
+            .ToListAsync();
+    }
+
+    private void OnCategoryChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int categoryId))
+        {
+            selectedCategoryId = categoryId;
+            newTopic.SubCategoryId = 0;
+
+            var selectedCategory = categories.FirstOrDefault(c => c.Id == categoryId);
+            filteredSubCategories = selectedCategory?.SubCategories?.ToList() ?? new List<SubCategory>();
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (newTopic.SubCategoryId > 0 && !string.IsNullOrWhiteSpace(newTopic.Title))
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            Console.WriteLine($"IsAuthenticated: {user.Identity?.IsAuthenticated}");
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                Console.WriteLine($"Found UserId from AuthState: {userId}");
+                newTopic.UserId = userId;
+            }
+            else
+            {
+                Console.WriteLine("User NOT authenticated, fetching default user...");
+                var defaultUser = await Context.Users.FirstOrDefaultAsync();
+                Console.WriteLine($"DefaultUser Id: {defaultUser?.Id}, Name: {defaultUser?.Name}, UserName: {defaultUser?.UserName}");
+                newTopic.UserId = defaultUser?.Id;
+            }
+
+            newTopic.CreatedAt = DateTime.UtcNow;
+
+            Context.Topics.Add(newTopic);
+            await Context.SaveChangesAsync();
+
+            Navigation.NavigateTo("/");
+        }
+    }
+}
