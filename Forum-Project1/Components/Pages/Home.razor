@@ -53,6 +53,7 @@
         <AuthorizeView Roles="Admin">
             <Authorized>
                 <a href="create-category" class="btn btn-warning fw-bold mb-3">+ Create a Category</a>
+                <a href="create-thread" class="btn btn-warning fw-bold">+ Create a thread</a>
             </Authorized>
             <NotAuthorized>
                 <h3>Forum Overview</h3>
@@ -85,7 +86,7 @@
                                     </h5>
                                     <small class="text-muted">@kateg.Description</small>
                                 </div>
-                                <span class="badge bg-secondary rounded-pill">124 threads</span>
+                                <span class="badge bg-secondary rounded-pill">2 threads</span>
                             </div>
                         }
                     }
@@ -107,7 +108,7 @@
                     }
                     else
                     {
-                        @foreach (var topic in latestTopics.OrderByDescending(t => t.CreatedAt).Take(8))
+                        @foreach (var topic in latestTopics.OrderByDescending(t => t.CreatedAt).Take(7))
                         {
                             <li class="list-group-item">
                                 <NavLink href="@($"/topicDetails-page/{topic.Id}")" class="fw-bold text-decoration-none text-primary">

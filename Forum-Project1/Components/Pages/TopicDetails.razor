@@ -19,7 +19,7 @@ else
     <div style="background-color: #2b3035; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
         <h2 style="margin: 0;">@topic.Title</h2>
         <span style="color: #adb5bd; font-size: 0.85rem;">
-            Created by: @(topic.ApplicationUser?.Name ?? "Admin") • @topic.CreatedAt.ToString("yyyy-MM-dd")
+            @topic.CreatedAt.ToString("yyyy-MM-dd")
         </span>
     </div>
 
