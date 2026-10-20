@@ -4,6 +4,8 @@
 @using Microsoft.AspNetCore.Identity
 @using Forum_Project1.Data
 
+@rendermode InteractiveServer
+
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
@@ -70,6 +72,9 @@
 
 @code {
     private IEnumerable<IdentityError>? identityErrors;
+    
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
@@ -117,8 +122,7 @@
             return;
         }
 
-        await SignInManager.SignInAsync(newUser, isPersistent: false);
-        RedirectManager.RedirectTo(ReturnUrl);
+        RedirectManager.RedirectTo("/Account/Login");
     }
 
     private async Task<string?> SaveProfileImageAsync(IBrowserFile file)
@@ -170,6 +174,7 @@
 
     private sealed class InputModel
     {
+
         [Required]
         [EmailAddress]
         [Display(Name = "Email")]

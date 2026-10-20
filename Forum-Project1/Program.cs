@@ -4,6 +4,7 @@ using Forum_Project1.Data;
 using Forum_Project1.Repositories;
 using Forum_Project1.Repositories.Interfaces;
 using Forum_Project1.Services;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -49,9 +50,13 @@ namespace Forum_Project1
             builder.Services.AddScoped<IPrivateMessageService, PrivateMessageService>();
             builder.Services.AddScoped<IUserService, UserService>();
 
-            builder.Services.AddScoped(sp => new HttpClient
+            builder.Services.AddScoped(sp =>
             {
-                BaseAddress = new Uri("https://blazorforum1-cdbebufng0dpb7ak.swedencentral-01.azurewebsites.net/")
+                var navigationManager = sp.GetRequiredService<NavigationManager>();
+                return new HttpClient
+                {
+                    BaseAddress = new Uri(navigationManager.BaseUri)
+                };
             });
 
             builder.Services.AddControllers().AddJsonOptions(options =>
