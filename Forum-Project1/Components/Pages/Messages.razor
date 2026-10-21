@@ -15,12 +15,12 @@
         
         <div class="col-md-4 border-end border-secondary p-0" style="height: 100%; overflow-y: auto;">
             <div class="p-3 bg-dark fw-bold border-bottom border-secondary">
-                Chattar
+                Chats
             </div>
             <ul class="list-group list-group-flush">
                 @if (users == null)
                 {
-                    <li class="list-group-item bg-transparent text-white">Laddar användare...</li>
+                    <li class="list-group-item bg-transparent text-white">Loading users...</li>
                 }
                 else
                 {
@@ -45,7 +45,7 @@
             @if (string.IsNullOrEmpty(selectedUserId))
             {
                 <div class="d-flex align-items-center justify-content-center h-100 text-muted">
-                    <h5>Välj en användare i listan till vänster för att starta en chatt</h5>
+                    <h5>Select a user from the list on the left to start a chat</h5>
                 </div>
             }
             else
@@ -67,7 +67,7 @@
                     <div class="input-group">
                         <input type="text" class="form-control" placeholder="Write a message..." 
                                @bind="newMessageText" @bind:event="oninput" @onkeyup="HandleKeyUp" />
-                        <button class="btn btn-primary" type="button" @onclick="SendMessage">Skicka</button>
+                        <button class="btn btn-primary" type="button" @onclick="SendMessage">Send</button>
                     </div>
                 </div>
             }

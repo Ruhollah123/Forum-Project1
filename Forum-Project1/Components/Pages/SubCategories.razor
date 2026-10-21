@@ -15,7 +15,8 @@
     @if (listOfSubcategories == null)
     {
         <div class="text-white-50">Loading subcategories...</div>
-    }else if (!listOfSubcategories.Any())
+    }
+    else if (!listOfSubcategories.Any())
     {
         <div class="alert alert-dark">No subcategories found.</div>
     }

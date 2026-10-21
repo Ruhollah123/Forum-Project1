@@ -11,7 +11,7 @@
 
 @if (reports == null)
 {
-    <p>Laddar anmälningar...</p>
+    <p>Loading reports...</p>
 }
 else if (!reports.Any())
 {
@@ -22,11 +22,11 @@ else
     <table class="table table-striped">
         <thead>
             <tr>
-                <th>Datum</th>
-                <th>Anmält Inlägg</th>
-                <th>Skapat av</th>
-                <th>Anmält av</th>
-                <th>Åtgärd</th>
+                <th>Date</th>
+                <th>Reported Post</th>
+                <th>Created by</th>
+                <th>Reported by</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -43,17 +43,17 @@ else
                         }
                         else
                         {
-                            <span class="text-muted">Inlägget är borttaget</span>
+                            <span class="text-muted">The post has been deleted</span>
                         }
                     </td>
                     <td>@report.Post?.ApplicationUser?.Name</td>
                     <td>@(report.ApplicationUser?.Name ?? report.ReportedByUserId)</td>
                     <td>
                         <button class="btn btn-danger btn-sm" @onclick="() => DeletePost(report)">
-                            Ta bort inlägg
+                            Delete Post
                         </button>
                         <button class="btn btn-secondary btn-sm" @onclick="() => DismissReport(report)">
-                            Avfärda
+                            Dismiss
                         </button>
                     </td>
                 </tr>
