@@ -16,6 +16,8 @@ namespace Forum_Project1.Data
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
+            //Dataseedningen har jag tagit av AI, för det skulle ta jättemycket tid annars.
+
             // 1. CREATE ROLES
             string[] roleNames = { "Admin", "User" };
             foreach (var roleName in roleNames)
