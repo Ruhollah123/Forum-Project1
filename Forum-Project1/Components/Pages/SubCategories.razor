@@ -9,7 +9,12 @@
 <div class="container my-4">
 
     <h2 class="mb-4 text-white">Subcategories</h2>
-    <a href="/create-subcategory" class="btn btn-warning fw-bold mb-3">+ Create a Subcategory</a>
+
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <a href="/create-subcategory" class="btn btn-warning fw-bold mb-3">+ Create a Subcategory</a>
+        </Authorized>
+    </AuthorizeView>
 
 
     @if (listOfSubcategories == null)
@@ -45,10 +50,10 @@
 
     [Parameter]
     public int CategoryId { get; set; }
-    
+
     [Parameter]
     public int? SubCategoryId { get; set; }
-    
+
     protected override async Task OnParametersSetAsync()
     {
         try
